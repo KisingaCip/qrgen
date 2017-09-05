@@ -15,6 +15,27 @@ from docx.shared import Cm
 import time
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
+# prepare the the code range and a temp folder
+
+try:
+    start= raw_input("First Barcode:_ ")
+    stop = raw_input('Last Barcode:_ ')
+except:
+    start= input("First Barcode:_ ") 
+    stop = input('Last Barcode:_ ') 
+start_time =time.time()
+try:
+    if int(stop)>=int(start):
+        subdir= 'temp'
+        if os.path.isdir(subdir):
+            shutil.rmtree(subdir)
+        os.mkdir(subdir)
+        os.chdir(subdir)
+        print("Generating codes......  please wait!")
+    else:
+        print("Invalid range! Exiting....!")
+except:
+    sys.exit()
 
 def do_qr(text, mark=None, box_size=10, border=4, fileext="png"):
     """ Writes out a QR code to a PNG file """
@@ -84,18 +105,31 @@ if __name__ == "__main__":
         except Exception as x:
             print "Note: Couldn't open overlay {0}, is it a PNG?" % args.overlay, x
 
-    for line in args.text:
-        # Accept stdin lines
-        line = line.strip()
+    for line in range(int(start),int(stop)+1):
+            # Accept stdin lines
+        line ='prefix%06d' %(line)
 
-        print "Generating QR for {0}...".format(line),
+        #print "Generating QR for {0}...".format(line),
         try:
-
+            #set a background image with a text
+            try: #set the font path for the OS
+                font = ImageFont.truetype("/Library/Fonts/Arial Italic.ttf",9) # MacOS
+            except:
+                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerifCondensed.ttf",9) # Linux
+     
+            background = Image.new("RGBA", (116,126),(0,0,0))
+            draw = ImageDraw.Draw(background)
+            #text to be included at the bottom of the image
+            draw.text((0, 117),"text prefix"+line,(255,255,255),font=font)
+            draw = ImageDraw.Draw(background)
+            draw = ImageDraw.Draw(background)
+            #qr code layer
             img = do_qr("{0}{1}{2}".format(args.prefix, line, args.suffix),
                         mark=mark,
                         box_size=args.size,
                         border=args.border,
                         )
+            background.paste(img,(0,0),img) # Overlay the QR to the bacground image
 
             # Save to filename.format (strip unsafe chars)
             try:
@@ -104,11 +138,51 @@ if __name__ == "__main__":
                 filename += '.{0}'.format(args.format.strip())
 
                 # Write out image
-                img.save(filename)
+                background.save(filename)
             except Exception as x:
                 print "!!! Could not save %s!" % filename, x
-            else:
-                print "saved as {0}".format(filename)
+            #else:
+            #   print "saved as {0}".format(filename)
         except Exception as x:
             print "ERROR while generating '%s':" % line, x
+    # get the file list into a word document
+    files = os.listdir(os.getcwd())
+    document = Document()
+    #set document margins
+    sections = document.sections
+    for section in sections:
+        section.top_margin = Cm(0.59)
+        section.bottom_margin = Cm(0.59)
+        section.left_margin = Cm(1.0)
+        section.right_margin = Cm(1.0)
+    try:
+        tbl = document.add_table(rows=1, cols=3)
+        tbl.autofit = False
+        tbl.style='Table Grid'
+        tbl.columns[0].width = Cm(8.76)
+        tbl.columns[1].width = Cm(0.71)
+        tbl.columns[2].width = Cm(8.76)
+    except:
+        print('Error setting table format')
+
+    
+    for i in files:
+        if i[len(i)-3:len(i)].upper() == 'PNG':
+            row_cells = tbl.add_row().cells
+            p = row_cells[0].paragraphs[0]
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER            
+            r = p.add_run()
+            r.add_picture(i,width=Cm(3.07))
+
+    os.chdir('../')
+    shutil.rmtree(subdir)
+    def remove_row(table, row):
+        tbl = table._tbl
+        tr = row._tr
+        tbl.remove(tr)
+    row = tbl.rows[0]
+    remove_row(tbl, row)
+    document.save('doc_name %s-%s.docx' %(start,stop))
+ 
+    print('------ %.3f sec ------'%(time.time()-start_time))    
     print "Done!"
