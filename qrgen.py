@@ -7,6 +7,13 @@ import qrcode
 import sys
 import argparse
 from PIL import Image, ImageEnhance
+from PIL import ImageFont
+from PIL import ImageDraw
+import glob, shutil, os
+from docx import Document
+from docx.shared import Cm
+import time
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 
 def do_qr(text, mark=None, box_size=10, border=4, fileext="png"):
